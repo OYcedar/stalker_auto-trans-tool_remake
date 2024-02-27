@@ -43,12 +43,13 @@ def main(argv):
     convertToCHS = False
     scriptsTranslateFunctionName = 'game.translate_string'
     ua = ""
+    api = None
 
     opts, args = getopt.getopt(argv[1:], "choe:i:k:f:t:p:a:b:r:", [
-                               "runnableCheck", "convertToCHS", "help", "outputAnyway", "engine=", "appId=", "appKey=", "fromLang=", "toLang=", "path=", "forceTransFiles=", "reusePath=", "blackListIdJson=", "analyzeCharCount=", "function=", "ua="])
+                               "runnableCheck", "convertToCHS", "help", "outputAnyway", "engine=", "api=", "appId=", "appKey=", "fromLang=", "toLang=", "path=", "forceTransFiles=", "reusePath=", "blackListIdJson=", "analyzeCharCount=", "function=", "ua="])
     print(opts)
     for opt, arg in opts:
-        if opt in ("-h", "--help"):
+        if opt in ["-h", "--help"]:
             helpText = """
 S.T.A.L.K.E.R. Game(X-Ray Engine or like) Text Auto-Translator, using with language pack generator is recommended.
 Version 2.1.2, Updated at March 23th 2023
@@ -56,11 +57,13 @@ by wzyddg(FB) from baidu S.T.A.L.K.E.R. tieba
 
 Options:
   -e <value>|--engine=<value>               use what translate engine.
-                                                eg: baidu qq google bing
+                                                eg: google bing deepl baidu qq seamlessm4t 
   -p <value>|--path=<value>                 path of the folder containing what you want to translate.
                                                 always quote with ""
   -t <value>|--toLang=<value>               translate to what language.
                                                 eg: eng chs
+  --api=<value>                             (Optional)translate api of engine.
+                                                required for seamlessm4t or other local engines, if any.
   -i <value>|--appId=<value>                (Optional)appId of engine.
                                                 required for baidu
   -k <value>|--appKey=<value>               (Optional)appKey of engine.
@@ -89,50 +92,50 @@ Options:
         """
             print(helpText)
             sys.exit()
-        elif opt in ("-e", "--engine"):
+        elif opt in ["-e", "--engine"]:
             engine = arg
-        elif opt in ("-c", "--runnableCheck"):
+        elif opt in ["-c", "--runnableCheck"]:
             runnableCheck = True
-        elif opt in ("-i", "--appId"):
+        elif opt in ["--api"]:
+            api = arg
+        elif opt in ["-i", "--appId"]:
             appId = arg
-        elif opt in ("-k", "--appKey"):
+        elif opt in ["-k", "--appKey"]:
             appKey = arg
-        elif opt in ("-p", "--path"):
+        elif opt in ["-p", "--path"]:
             textDir = arg
-        elif opt in ("-f", "--fromLang"):
+        elif opt in ["-f", "--fromLang"]:
             sourceLangForTextTag = arg
-        elif opt in ("-t", "--toLang"):
+        elif opt in ["-t", "--toLang"]:
             targetLang = arg
-        elif opt in ("-o", "--outputAnyway"):
+        elif opt in ["-o", "--outputAnyway"]:
             outputAnyway = True
-        elif opt in ("-a", "--analyzeCharCount"):
+        elif opt in ["-a", "--analyzeCharCount"]:
             analyzeCharCount = int(arg)
-        elif opt in ("-r", "--reusePath"):
+        elif opt in ["-r", "--reusePath"]:
             reuseDir = arg
-        elif opt in ("-b", "--blackListIdJson"):
+        elif opt in ["-b", "--blackListIdJson"]:
             blackListJson = arg
-        elif opt in ("--forceTransFiles"):
+        elif opt in ["--forceTransFiles"]:
             forceTrans = arg.split(",")
-        elif opt in ("--convertToCHS"):
+        elif opt in ["--convertToCHS"]:
             convertToCHS = True
             zhconv.loaddict(os.path.join(os.path.dirname(
                 __file__), "resources", "zhcdict.json"))
-        elif opt in ("--function"):
+        elif opt in ["--function"]:
             transFunction = arg
             # support legacy cmd/shell
             if transFunction == 'gameplay':
                 transFunction = 'cfgxml'
             if transFunction == 'script':
                 transFunction = 'scriptL'
-        elif opt in ("--ua"):
+        elif opt in ["--ua"]:
             ua = arg
 
     # validation
     assert engine is not None, "engine must be provided."
     assert textDir is not None, "text folder path must be provided."
-    assert targetLang is not None, "target language must be provided."
-    if engine == 'baidu':
-        assert appId is not None and appKey is not None, "when using baidu, AppId and AppKey must be provided, see https://fanyi-api.baidu.com/api/trans/product/desktop"
+    assert targetLang is not None, "target language must be provided."        
 
     # preparation
 
@@ -142,17 +145,21 @@ Options:
         elif e == 'google':
             return webTranslator.GoogleTranslator()
         elif e == 'baidu':
+            assert appId is not None and appKey is not None, "when using baidu, AppId and AppKey must be provided, see https://fanyi-api.baidu.com/api/trans/product/desktop"
             return webTranslator.BaiduTranslator(appId, appKey)
         # elif e == 'deepl':
         #     return webTranslator.DeepLTranslator()
         elif e == 'bing':
             return webTranslator.BingTranslator()
+        elif e == 'seamlessm4t':
+            assert api is not None, "api must be provided to seamlessm4t."
+            return webTranslator.SeamlessM4TTranslator(api)
 
     def getBenchPlayerTrans(e) -> webTranslator.WebTranslator:
-        if e == 'qq':
+        if e != 'google':
             return webTranslator.GoogleTranslator()
         else:
-            return webTranslator.TransmartQQTranslator(1)
+            return webTranslator.BingTranslator()
 
     # actual logic
     lst = os.listdir(textDir)

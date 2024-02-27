@@ -38,12 +38,14 @@ class WebTranslator(ABC):
     def cutSentenceWithLineEnds(self, text: str, lineEnds: list[str] = ["?", ".", "!"]) -> list[str]:
         lineEndPtn = re.compile("["+"".join(lineEnds)+"]+")
         seps = lineEndPtn.findall(text)
+        if len(seps) == 0:
+            return [text]
         pieces = lineEndPtn.split(text)
         assert len(pieces) == len(seps) + \
             1, "separator and pieces count won't match"
         sentences = []
         for i in range(len(seps)):
             sentences.append(pieces[i]+seps[i])
-        if len(sentences) > 0:
-            sentences[-1] = sentences[-1]+pieces[-1]
+        if len(sentences) > 0 and len(pieces[-1].strip())>0:
+            sentences.append(pieces[-1])
         return sentences

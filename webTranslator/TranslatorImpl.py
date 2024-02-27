@@ -10,6 +10,7 @@ import requests
 import json
 import base64
 import random
+import nltk
 
 
 class BingTranslator(WebTranslator):
@@ -153,22 +154,6 @@ class GoogleTranslator(WebTranslator):
     def getApiLangCode(self, textLang: str) -> str:
         return GoogleTranslator.__langCodeMap[textLang]
 
-    def resultFilter(self, sourceText: str, resultText: str) -> str:
-        return resultText
-
-    def cutSentenceWithLineEnds(self, text: str, lineEnds: list[str] = ["?", ".", "!"]) -> list[str]:
-        lineEndPtn = re.compile("["+"".join(lineEnds)+"]+")
-        seps = lineEndPtn.findall(text)
-        pieces = lineEndPtn.split(text)
-        assert len(pieces) == len(seps) + \
-            1, "separator and pieces count won't match"
-        sentences = []
-        for i in range(len(seps)):
-            sentences.append(pieces[i]+seps[i])
-        if len(sentences) > 0:
-            sentences[-1] = sentences[-1]+pieces[-1]
-        return sentences
-
     def doTranslate(self, text: str, fromLang: str, toLang: str, isRetry: bool = False) -> str:
         if fromLang == self.autoLangCode:
             fromLang = self.detectLang(text)
@@ -193,6 +178,8 @@ class GoogleTranslator(WebTranslator):
         # add GET length limit for google, last known safe length: 14678, maybe max 16k
         if len(self.mainTransApi+"?"+paramsStr) > self.safeEncodedLength:
             sentences = self.cutSentenceWithLineEnds(text)
+            # check lang list
+            # sentences = nltk.sent_tokenize(text)
             mid = math.floor(len(sentences)/2)
             return self.doTranslate("".join(sentences[0:mid]), fromLang, toLang)+self.doTranslate("".join(sentences[mid:]), fromLang, toLang)
 
@@ -231,6 +218,67 @@ class GoogleTranslator(WebTranslator):
             return text
 
         return self.resultFilter(text, res)
+    
+
+class SeamlessM4TTranslator(WebTranslator):
+
+    __langCodeMap = {
+        "chs": "cmn",
+        "eng": "eng",
+        # "auto": "auto",
+        "rus": "rus",
+        "ukr": "ukr"
+    }
+
+    def __init__(self, trans_url_end_point: str):
+        super().__init__()
+        print("must provide your local seamless M4T http api endpoint.\nwith POST method and body like {\"text\":\"some text\",\"from\":\"langCode\",\"to\":\"langCode\"}\nlangCode is same with seamless official language code list.\n")
+        self.mainTransApi = trans_url_end_point
+        self.eachRequestGap = 0.2
+        self.timedOutGap = 1
+        self.lastRequest
+        # self.safeEncodedLength = 14678
+
+    def getApiLangCode(self, textLang: str) -> str:
+        return SeamlessM4TTranslator.__langCodeMap[textLang]
+
+    def doTranslate(self, text: str, fromLang: str, toLang: str, isRetry: bool = False) -> str:
+        if fromLang == self.autoLangCode:
+            fromLang = self.detectLang(text)
+        runFL = self.getApiLangCode(fromLang)
+        runTL = self.getApiLangCode(toLang)
+
+        if timeit.default_timer()-self.lastRequest < self.eachRequestGap:
+            sleep(self.eachRequestGap)
+
+        sentences = self.cutSentenceWithLineEnds(text)
+            # check lang list
+        # sentences = nltk.sent_tokenize(text)
+
+        params = {
+            "from":runFL,
+            "to":runTL,
+            "text":text
+        }
+
+        translatedText = ""
+
+        for sentence in sentences:
+            response = None
+            params["text"] = sentence
+            try:
+                response = requests.post(self.mainTransApi,json=params,headers={
+                                     'Content-Type': 'application/json'})
+                translatedText = translatedText+response.text
+            except Exception as exc:
+                    print(exc.args[0])
+                    sleep(self.timedOutGap)
+                    return self.doTranslate(sentence, fromLang, toLang)
+
+        self.lastRequest = timeit.default_timer()
+
+        return self.resultFilter(text, translatedText)
+
 
 
 class TransmartQQTranslator(WebTranslator):
