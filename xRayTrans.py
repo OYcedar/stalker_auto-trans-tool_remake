@@ -7,7 +7,6 @@ import getopt
 import zhconv
 import json
 
-
 class Unbuffered(object):
     def __init__(self, stream):
         self.stream = stream
@@ -57,7 +56,7 @@ by wzyddg(FB) from baidu S.T.A.L.K.E.R. tieba
 
 Options:
   -e <value>|--engine=<value>               use what translate engine.
-                                                eg: google bing deepl baidu qq seamlessm4t 
+                                                eg: google bing baidu qq seamlessm4t 
   -p <value>|--path=<value>                 path of the folder containing what you want to translate.
                                                 always quote with ""
   -t <value>|--toLang=<value>               translate to what language.
@@ -147,8 +146,8 @@ Options:
         elif e == 'baidu':
             assert appId is not None and appKey is not None, "when using baidu, AppId and AppKey must be provided, see https://fanyi-api.baidu.com/api/trans/product/desktop"
             return webTranslator.BaiduTranslator(appId, appKey)
-        # elif e == 'deepl':
-        #     return webTranslator.DeepLTranslator()
+        elif e == 'deepl':
+            return webTranslator.PyDeepLXTranslator()
         elif e == 'bing':
             return webTranslator.BingTranslator()
         elif e == 'seamlessm4t':

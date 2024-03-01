@@ -5,13 +5,14 @@ from time import sleep, time
 import timeit
 from typing import Any, Dict, Tuple
 from .entityDefinition import WebTranslator
+from .PyDeepLXImprove import deeplTranslate
 import urllib
 import requests
 import json
 import base64
 import random
 import os
-from PyDeepLX import PyDeepLX
+# from PyDeepLX import PyDeepLX
 
 
 class BingTranslator(WebTranslator):
@@ -450,7 +451,7 @@ class DeepLTranslator(WebTranslator):
         super().__init__()
         self.analyzeApi = "https://www2.deepl.com/jsonrpc?method=LMT_split_text"
         self.mainTransApi = "https://www2.deepl.com/jsonrpc?method=LMT_handle_jobs"
-        self.eachRequestGap = 3
+        self.eachRequestGap = 2
         self.timedOutGap = 5
         self.jobsPerRequest = 12
 
@@ -486,6 +487,15 @@ class DeepLTranslator(WebTranslator):
         for chunk in digIntoRes:
             senten = chunk["sentences"][0]
             texts.append((senten["prefix"], senten["text"]))
+        return texts
+    
+    # [(prefix,text)]
+    def analyzeTextLocally(self, text: str, lang: str) -> list[Tuple[str, str]]:
+        # deepl server analyze sucks, split locally
+        texts = []
+        sentences = self.cutSentenceWithLineEnds(text)
+        for sent in sentences:
+            texts.append(("",sent))
         return texts
 
     def generateJobs(self, texts: list[Tuple[str, str]]) -> list[Dict[str, Any]]:
@@ -535,8 +545,8 @@ class DeepLTranslator(WebTranslator):
                         "weight": {},
                         "default": "default"
                     },
-                    "source_lang_computed": self.getApiLangCode(fromLang),
-                    "target_lang": self.getApiLangCode(toLang)
+                    "source_lang_computed": fromLang,
+                    "target_lang": toLang
                 },
                 "priority": 1,
                 "commonJobParams": {
@@ -571,9 +581,11 @@ class DeepLTranslator(WebTranslator):
     def doTranslate(self, text: str, fromLang: str, toLang: str) -> str:
         if fromLang == self.autoLangCode:
             fromLang = self.detectLang(text)
+        runFL = self.getApiLangCode(fromLang)
+        runTL = self.getApiLangCode(toLang)
 
         # if this goes wrong means this engine wont do
-        textPairs = self.analyzeTextByEngine(text, fromLang)
+        textPairs = self.analyzeTextLocally(text, fromLang)
 
         if timeit.default_timer()-self.lastRequest < self.eachRequestGap:
             sleep(self.eachRequestGap)
@@ -584,7 +596,7 @@ class DeepLTranslator(WebTranslator):
         for batchI in range(math.ceil(len(jobs)/self.jobsPerRequest)):
             # transWithRange(self, jobs: list[Dict[str, Any]], start: int, end: int, fromLang: str, toLang: str):
             res = res+self.transWithRange(jobs, batchI*self.jobsPerRequest, min(
-                (batchI+1)*self.jobsPerRequest, len(jobs)), fromLang, toLang)
+                (batchI+1)*self.jobsPerRequest, len(jobs)), runFL, runTL)
 
         return res
 
@@ -599,7 +611,7 @@ class PyDeepLXTranslator(WebTranslator):
     def __init__(self):
         super().__init__()
         self.eachRequestGap = 2
-        self.timedOutGap = 8
+        self.timedOutGap = 5
         self.jobsPerRequest = 12
         self.adbPath = r"C:\platform-tools\adb.exe "
 
@@ -619,7 +631,7 @@ class PyDeepLXTranslator(WebTranslator):
 
         res = ""
         try:
-            res = PyDeepLX.translate(text, runFL, runTL) # Return String
+            res = deeplTranslate(text, runFL, runTL) # Return String
         except Exception as exc:
             if "Too many requests" in str(exc):
                 print("(Too many requests, banned for now, wait "+str(self.timedOutGap)+" seconds.)")
