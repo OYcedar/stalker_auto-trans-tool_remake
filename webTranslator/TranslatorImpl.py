@@ -10,7 +10,8 @@ import requests
 import json
 import base64
 import random
-import nltk
+import os
+from PyDeepLX import PyDeepLX
 
 
 class BingTranslator(WebTranslator):
@@ -78,7 +79,7 @@ class BingTranslator(WebTranslator):
             pass
 
     def getApiLangCode(self, textLang: str) -> str:
-        return BingTranslator.__langCodeMap[textLang]
+        return BingTranslator.__langCodeMap[textLang] or textLang
 
     def doTranslate(self, text: str, fromLang: str, toLang: str, isRetry: bool = False) -> str:
         if fromLang == self.autoLangCode:
@@ -152,7 +153,7 @@ class GoogleTranslator(WebTranslator):
         self.safeEncodedLength = 14678
 
     def getApiLangCode(self, textLang: str) -> str:
-        return GoogleTranslator.__langCodeMap[textLang]
+        return GoogleTranslator.__langCodeMap[textLang] or textLang
 
     def doTranslate(self, text: str, fromLang: str, toLang: str, isRetry: bool = False) -> str:
         if fromLang == self.autoLangCode:
@@ -178,8 +179,6 @@ class GoogleTranslator(WebTranslator):
         # add GET length limit for google, last known safe length: 14678, maybe max 16k
         if len(self.mainTransApi+"?"+paramsStr) > self.safeEncodedLength:
             sentences = self.cutSentenceWithLineEnds(text)
-            # check lang list
-            # sentences = nltk.sent_tokenize(text)
             mid = math.floor(len(sentences)/2)
             return self.doTranslate("".join(sentences[0:mid]), fromLang, toLang)+self.doTranslate("".join(sentences[mid:]), fromLang, toLang)
 
@@ -234,13 +233,13 @@ class SeamlessM4TTranslator(WebTranslator):
         super().__init__()
         print("must provide your local seamless M4T http api endpoint.\nwith POST method and body like {\"text\":\"some text\",\"from\":\"langCode\",\"to\":\"langCode\"}\nlangCode is same with seamless official language code list.\n")
         self.mainTransApi = trans_url_end_point
-        self.eachRequestGap = 0.2
+        self.eachRequestGap = 0
         self.timedOutGap = 1
         self.lastRequest
         # self.safeEncodedLength = 14678
 
     def getApiLangCode(self, textLang: str) -> str:
-        return SeamlessM4TTranslator.__langCodeMap[textLang]
+        return SeamlessM4TTranslator.__langCodeMap[textLang] or textLang
 
     def doTranslate(self, text: str, fromLang: str, toLang: str, isRetry: bool = False) -> str:
         if fromLang == self.autoLangCode:
@@ -252,8 +251,6 @@ class SeamlessM4TTranslator(WebTranslator):
             sleep(self.eachRequestGap)
 
         sentences = self.cutSentenceWithLineEnds(text)
-            # check lang list
-        # sentences = nltk.sent_tokenize(text)
 
         params = {
             "from":runFL,
@@ -298,7 +295,7 @@ class TransmartQQTranslator(WebTranslator):
         self.eachRequestGap = 0
 
     def getApiLangCode(self, textLang: str) -> str:
-        return TransmartQQTranslator.__langCodeMap[textLang]
+        return TransmartQQTranslator.__langCodeMap[textLang] or textLang
 
     def getClientKey(self, userAgent: str = ""):
         if len(userAgent.strip()) == 0:
@@ -433,7 +430,7 @@ class BaiduTranslator(WebTranslator):
         return res
 
     def getApiLangCode(self, textLang: str) -> str:
-        return BaiduTranslator.__langCodeMap[textLang]
+        return BaiduTranslator.__langCodeMap[textLang] or textLang
 
     def generateSign(self, query: str) -> str:
         chunk = self.appid+query+BaiduTranslator.fixedSalt+self.appkey
@@ -458,7 +455,7 @@ class DeepLTranslator(WebTranslator):
         self.jobsPerRequest = 12
 
     def getApiLangCode(self, textLang: str) -> str:
-        return DeepLTranslator.__langCodeMap[textLang]
+        return DeepLTranslator.__langCodeMap[textLang] or textLang
 
     # [(prefix,text)]
     def analyzeTextByEngine(self, text: str, lang: str) -> list[Tuple[str, str]]:
@@ -590,3 +587,53 @@ class DeepLTranslator(WebTranslator):
                 (batchI+1)*self.jobsPerRequest, len(jobs)), fromLang, toLang)
 
         return res
+
+
+class PyDeepLXTranslator(WebTranslator):
+    __langCodeMap = {
+        "chs": "ZH",
+        "eng": "EN",
+        "rus": "RU"
+    }
+
+    def __init__(self):
+        super().__init__()
+        self.eachRequestGap = 2
+        self.timedOutGap = 8
+        self.jobsPerRequest = 12
+        self.adbPath = r"C:\platform-tools\adb.exe "
+
+    def getApiLangCode(self, textLang: str) -> str:
+        return PyDeepLXTranslator.__langCodeMap[textLang] or textLang
+
+    def doTranslate(self, text: str, fromLang: str, toLang: str, isRetry: bool = False) -> str:
+        if fromLang == self.autoLangCode:
+            fromLang = self.detectLang(text)
+        runFL = self.getApiLangCode(fromLang)
+        runTL = self.getApiLangCode(toLang)
+
+        # if this goes wrong means this engine wont do
+
+        if timeit.default_timer()-self.lastRequest < self.eachRequestGap:
+            sleep(self.eachRequestGap)
+
+        res = ""
+        try:
+            res = PyDeepLX.translate(text, runFL, runTL) # Return String
+        except Exception as exc:
+            if "Too many requests" in str(exc):
+                print("(Too many requests, banned for now, wait "+str(self.timedOutGap)+" seconds.)")
+
+                os.system(self.adbPath +r" shell am start -a android.settings.AIRPLANE_MODE_SETTINGS")
+                sleep(1)
+                os.system(self.adbPath +r" shell input tap 950 1260")
+                sleep(1)
+                os.system(self.adbPath +r" shell input tap 950 1260")
+                sleep(1)
+                os.system(self.adbPath +r" shell input keyevent 4")
+                sleep(1)
+
+                sleep(self.timedOutGap)
+                return self.doTranslate(text, fromLang, toLang, isRetry=True)
+
+        return self.resultFilter(text, res)
