@@ -632,20 +632,46 @@ class PyDeepLXTranslator(WebTranslator):
         res = ""
         try:
             res = deeplTranslate(text, runFL, runTL) # Return String
+            if (res == None or re.strip() == "") and (text != None and text.strip() != ""):
+                # do reboot
+                self.rebootForNoNetwork()
+                return self.doTranslate(text, fromLang, toLang, isRetry=True)
         except Exception as exc:
             if "Too many requests" in str(exc):
                 print("(Too many requests, banned for now, wait "+str(self.timedOutGap)+" seconds.)")
 
-                os.system(self.adbPath +r" shell am start -a android.settings.AIRPLANE_MODE_SETTINGS")
-                sleep(1)
-                os.system(self.adbPath +r" shell input tap 950 1260")
-                sleep(1)
-                os.system(self.adbPath +r" shell input tap 950 1260")
-                sleep(1)
-                os.system(self.adbPath +r" shell input keyevent 4")
-                sleep(1)
+                self.toggleAirPlaneAndBack()
 
                 sleep(self.timedOutGap)
                 return self.doTranslate(text, fromLang, toLang, isRetry=True)
-
         return self.resultFilter(text, res)
+    
+    def toggleAirPlaneAndBack(self):
+        os.system(self.adbPath +r" shell am start -a android.settings.AIRPLANE_MODE_SETTINGS")
+        sleep(1)
+        os.system(self.adbPath +r" shell input tap 950 1260")
+        sleep(1)
+        os.system(self.adbPath +r" shell input tap 950 1260")
+        sleep(1)
+        os.system(self.adbPath +r" shell input keyevent 4")
+        sleep(1)
+
+    def rebootForNoNetwork(self):
+        os.system(self.adbPath +r" reboot")
+        sleep(30)
+
+        # unlock with no pwd
+        os.system(self.adbPath +r" shell input swipe 300 1000 300 500")
+        sleep(1)
+
+        os.system(self.adbPath +r" shell am start -n com.android.settings/.TetherSettings")
+        sleep(1)
+        os.system(self.adbPath +r" shell input tap 950 1300")
+        sleep(5)
+        os.system(self.adbPath +r" shell input keyevent 4")
+        sleep(1)
+        os.system(self.adbPath +r" shell input keyevent 4")
+        sleep(1)
+
+
+
