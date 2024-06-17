@@ -65,6 +65,7 @@ def deeplTranslate(
     numberAlternative=0,
     printResult=False,
     proxies=None,
+    postProcess=None
 ):
     iCount = getICount(text)
     id = getRandomNumber()
@@ -118,9 +119,13 @@ def deeplTranslate(
 
         if numberAlternative <= 1:
             targetText = ""
-            for ent in respJson["result"]["texts"]:
-                targetText = targetText+ent["text"]
-            # respJson["result"]["texts"][0]["text"]
+            # for ent in respJson["result"]["texts"]:
+            #     targetText = targetText+ent["text"]
+            for i in range(len(respJson["result"]["texts"])):
+                ent = respJson["result"]["texts"][i]["text"]
+                if postProcess != None:
+                    ent = postProcess(sents[i], ent)
+                targetText = targetText+ent    
             if printResult:
                 print(targetText)
             return targetText

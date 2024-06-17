@@ -613,6 +613,7 @@ class PyDeepLXTranslator(WebTranslator):
         self.eachRequestGap = 2
         self.timedOutGap = 5
         self.jobsPerRequest = 12
+        self.puncEndPattern = re.compile(r"[,.!?，。？！]$")
         self.adbPath = r"C:\platform-tools\adb.exe "
 
     def getApiLangCode(self, textLang: str) -> str:
@@ -631,7 +632,7 @@ class PyDeepLXTranslator(WebTranslator):
 
         res = ""
         try:
-            res = deeplTranslate(text, runFL, runTL) # Return String
+            res = deeplTranslate(text, runFL, runTL, postProcess=self.resultFilter) # Return String
             if (res == None or res.strip() == "") and (text != None and text.strip() != ""):
                 # do reboot
                 self.rebootForNoNetwork()
@@ -650,6 +651,14 @@ class PyDeepLXTranslator(WebTranslator):
             return self.doTranslate(text, fromLang, toLang, isRetry=True)
         return self.resultFilter(text, res)
     
+    def resultFilter(self, sourceText: str, resultText: str) -> str:
+        # this is for engine bug, somethimes double the result, and maybe a wide comma between.
+        sSearch = self.puncEndPattern.search(sourceText.strip())
+        rSearch = self.puncEndPattern.search(resultText.strip())
+        if sSearch != None and rSearch == None :
+            resultText = resultText.strip()+sourceText.strip()[-1]
+        return resultText
+
     def toggleAirPlaneAndBack(self):
         os.system(self.adbPath +r" shell am start -a android.settings.AIRPLANE_MODE_SETTINGS")
         sleep(1)
