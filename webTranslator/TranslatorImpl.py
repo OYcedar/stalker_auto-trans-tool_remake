@@ -632,7 +632,7 @@ class PyDeepLXTranslator(WebTranslator):
         res = ""
         try:
             res = deeplTranslate(text, runFL, runTL) # Return String
-            if (res == None or re.strip() == "") and (text != None and text.strip() != ""):
+            if (res == None or res.strip() == "") and (text != None and text.strip() != ""):
                 # do reboot
                 self.rebootForNoNetwork()
                 return self.doTranslate(text, fromLang, toLang, isRetry=True)
@@ -643,7 +643,11 @@ class PyDeepLXTranslator(WebTranslator):
                 self.toggleAirPlaneAndBack()
 
                 sleep(self.timedOutGap)
-                return self.doTranslate(text, fromLang, toLang, isRetry=True)
+            else:
+                self.rebootForNoNetwork()
+            
+            # after all action if Exception
+            return self.doTranslate(text, fromLang, toLang, isRetry=True)
         return self.resultFilter(text, res)
     
     def toggleAirPlaneAndBack(self):
@@ -658,7 +662,7 @@ class PyDeepLXTranslator(WebTranslator):
 
     def rebootForNoNetwork(self):
         os.system(self.adbPath +r" reboot")
-        sleep(30)
+        sleep(60)
 
         # unlock with no pwd
         os.system(self.adbPath +r" shell input swipe 300 1000 300 500")

@@ -9,3 +9,6 @@ you can set every parameter for cfgxml/ltx/script, and insert a "-c" , this tool
   
 package :  
 pyinstaller -F .\xRayTrans.py -i .\4.ico --add-data="resources;resources"  
+
+poetry install :         
+pip install pyinstaller          
